@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: #7c3aed;
+  --color-primary-light: #8b5cf6;
+  --color-accent: #f59e0b;
+  --color-surface: rgba(255, 255, 255, 0.08);
+  --color-surface-border: rgba(255, 255, 255, 0.12);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* ═══ Animaciones ═══ */
+@keyframes orb-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -40px) scale(1.05); }
+  50% { transform: translate(-20px, 20px) scale(0.95); }
+  75% { transform: translate(15px, 30px) scale(1.02); }
+}
+
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes logo-pulse {
+  0%, 100% { box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4); }
+  50% { box-shadow: 0 4px 30px rgba(124, 58, 237, 0.6); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.animate-orb { animation: orb-float 14s ease-in-out infinite; }
+.animate-orb-delayed { animation: orb-float 16s ease-in-out infinite; animation-delay: -4s; }
+.animate-orb-slow { animation: orb-float 18s ease-in-out infinite; animation-delay: -8s; }
+.animate-card-enter { animation: card-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-logo-pulse { animation: logo-pulse 3s ease-in-out infinite; }
+.animate-shake { animation: shake 0.4s ease-in-out; }
