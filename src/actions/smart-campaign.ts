@@ -121,6 +121,7 @@ export async function publishCampaign(
       objective: strategy.objective,
       status: "PAUSED",
       special_ad_categories: "[]",
+      is_adset_budget_sharing_enabled: "false",
     }
   );
   console.log("[Smart Campaign] Campaña creada:", campaignResult.id);
@@ -145,18 +146,8 @@ export async function publishCampaign(
       ],
     },
   };
-
-  // Agregar intereses si existen
-  if (strategy.targeting.interests?.length > 0) {
-    targeting.flexible_spec = [
-      {
-        interests: strategy.targeting.interests.map((i) => ({
-          id: i.id,
-          name: i.name,
-        })),
-      },
-    ];
-  }
+  // Nota: No incluimos interests/flexible_spec porque Gemini genera IDs inventados.
+  // La segmentación por ubicación (15km Ixtlahuaca) + edad es más efectiva para negocios locales.
 
   console.log("[Smart Campaign] Creando Ad Set con targeting:", JSON.stringify(targeting));
   const adSetResult = await metaPost<{ id: string }>(
