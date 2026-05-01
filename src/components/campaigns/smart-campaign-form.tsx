@@ -6,7 +6,12 @@ import {
   Target, Users, DollarSign, Copy, Check, Rocket,
   Lightbulb, MapPin, Calendar, Megaphone, AlertCircle, type LucideIcon
 } from "lucide-react";
-import { generateCampaignStrategy, publishCampaign, type CampaignStrategy, type PublishResult } from "@/actions/smart-campaign";
+import {
+  generateCampaignStrategy,
+  publishCampaign,
+  type CampaignStrategy,
+  type PublishResult,
+} from "@/actions/smart-campaign";
 
 type Step = "input" | "review" | "publishing" | "done";
 
@@ -51,7 +56,12 @@ export default function SmartCampaignForm() {
 
     try {
       const result = await publishCampaign(strategy, selectedCopy, link || undefined);
-      setPublishResult(result);
+      if (!result.ok) {
+        setError(result.error || "Error al publicar la campaña en Meta");
+        setStep("review");
+        return;
+      }
+      setPublishResult(result.data);
       setStep("done");
     } catch (err: any) {
       setError(err.message || "Error al publicar la campaña en Meta");
