@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import {
-  Sparkles, Loader2, CheckCircle2, ArrowRight, ArrowLeft,
+  Sparkles, Loader2, CheckCircle2, ArrowLeft,
   Target, Users, DollarSign, Copy, Check, Rocket,
-  Lightbulb, MapPin, Calendar, Megaphone, AlertCircle, type LucideIcon
+  Lightbulb, MapPin, Calendar, Megaphone, AlertCircle, ImageIcon, Upload, type LucideIcon
 } from "lucide-react";
 import {
   generateCampaignStrategy,
@@ -12,8 +12,13 @@ import {
   type CampaignStrategy,
   type PublishResult,
 } from "@/actions/smart-campaign";
+import { uploadImageToMeta } from "@/actions/ad-image";
 
 type Step = "input" | "review" | "publishing" | "done";
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export default function SmartCampaignForm() {
   const [step, setStep] = useState<Step>("input");
@@ -25,6 +30,9 @@ export default function SmartCampaignForm() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
   const [link, setLink] = useState("");
+  const [adImageBase64, setAdImageBase64] = useState<string | null>(null);
+  const [adImageMime, setAdImageMime] = useState<string>("image/png");
+  const [imageError, setImageError] = useState("");
 
   // ── Paso 1: Generar estrategia con IA ──
   async function handleGenerate(e: React.FormEvent) {
@@ -38,12 +46,38 @@ export default function SmartCampaignForm() {
     try {
       const result = await generateCampaignStrategy(objective);
       setStrategy(result);
+      setSelectedCopy(result.recommendedCopyIndex ?? 0);
       setStep("review");
-    } catch (err: any) {
-      setError(err.message || "Error al generar la estrategia");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Error al generar la estrategia"));
     } finally {
       setIsLoading(false);
     }
+  }
+
+  // ── Leer imagen localmente ──
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError("La imagen no debe superar los 5MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      const [header, base64] = result.split(',');
+      const mime = header.split(':')[1].split(';')[0];
+      setAdImageBase64(base64);
+      setAdImageMime(mime);
+      setImageError("");
+    };
+    reader.onerror = () => {
+      setImageError("Error al leer el archivo");
+    };
+    reader.readAsDataURL(file);
   }
 
   // ── Paso 2: Publicar en Meta ──
@@ -55,7 +89,18 @@ export default function SmartCampaignForm() {
     setStep("publishing");
 
     try {
-      const result = await publishCampaign(strategy, selectedCopy, link || undefined);
+      // Subir imagen a Meta si fue generada
+      let imageHash: string | undefined;
+      if (adImageBase64) {
+        try {
+          const uploaded = await uploadImageToMeta(adImageBase64, adImageMime);
+          imageHash = uploaded.imageHash;
+        } catch (err: unknown) {
+          console.warn("No se pudo subir la imagen, publicando sin imagen:", err);
+        }
+      }
+
+      const result = await publishCampaign(strategy, selectedCopy, link || undefined, imageHash);
       if (!result.ok) {
         setError(result.error || "Error al publicar la campaña en Meta");
         setStep("review");
@@ -63,8 +108,8 @@ export default function SmartCampaignForm() {
       }
       setPublishResult(result.data);
       setStep("done");
-    } catch (err: any) {
-      setError(err.message || "Error al publicar la campaña en Meta");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Error al publicar la campaña en Meta"));
       setStep("review");
     } finally {
       setIsLoading(false);
@@ -221,6 +266,20 @@ export default function SmartCampaignForm() {
             </span>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4">
+              <p className="text-white/50 text-xs uppercase tracking-wider mb-1">Hipótesis</p>
+              <p className="text-white/80 text-sm">{strategy.hypothesis}</p>
+            </div>
+            <div className="bg-white/[0.04] border border-white/[0.08] rounded-xl p-4">
+              <p className="text-white/50 text-xs uppercase tracking-wider mb-1">KPI Esperado</p>
+              <p className="text-white/80 text-sm">
+                {strategy.expectedKpi.metric}: {strategy.expectedKpi.targetValue}
+              </p>
+              <p className="text-white/50 text-xs mt-1">{strategy.expectedKpi.reason}</p>
+            </div>
+          </div>
+
           {/* Copies */}
           <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-6">
             <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
@@ -242,7 +301,7 @@ export default function SmartCampaignForm() {
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
                       selectedCopy === i ? "bg-purple-500/30 text-purple-300" : "bg-white/10 text-white/50"
                     }`}>
-                      Opción {i + 1}
+                      Opción {i + 1} · Score {copy.score?.total ?? "-"}
                     </span>
                     {selectedCopy === i && <CheckCircle2 size={16} className="text-purple-400" />}
                   </div>
@@ -254,6 +313,76 @@ export default function SmartCampaignForm() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* ── Imagen del Anuncio ── */}
+          <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <ImageIcon size={18} className="text-pink-400" />
+              Imagen del Anuncio
+            </h3>
+
+            {!adImageBase64 && (
+              <div className="border-2 border-dashed border-white/10 rounded-xl p-8 flex flex-col items-center text-center">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-600/20 to-purple-600/20 flex items-center justify-center mb-4">
+                  <ImageIcon className="text-pink-400" size={28} />
+                </div>
+                <p className="text-white/50 text-sm mb-4 max-w-sm">
+                  Sube una imagen para acompañar tu anuncio. Se subirá automáticamente a Meta al publicar la campaña.
+                </p>
+                <label className="px-5 py-2.5 bg-gradient-to-r from-pink-600 to-purple-600 text-white text-sm font-medium rounded-xl hover:opacity-90 transition-opacity flex items-center gap-2 cursor-pointer">
+                  <Upload size={16} />
+                  Subir Imagen
+                  <input 
+                    type="file" 
+                    accept="image/png, image/jpeg" 
+                    className="hidden" 
+                    onChange={handleImageUpload} 
+                  />
+                </label>
+              </div>
+            )}
+
+            {adImageBase64 && (
+              <div className="space-y-4">
+                <div className="relative rounded-xl overflow-hidden border border-white/10 bg-black/20">
+                  <img
+                    src={`data:${adImageMime};base64,${adImageBase64}`}
+                    alt="Imagen seleccionada para el anuncio"
+                    className="w-full max-h-[400px] object-contain mx-auto"
+                  />
+                  <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-xs text-emerald-400 font-medium flex items-center gap-1">
+                    <CheckCircle2 size={12} />
+                    Lista para subir
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <label className="flex-1 py-2.5 flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white/70 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors cursor-pointer">
+                    <Upload size={14} />
+                    Cambiar imagen
+                    <input 
+                      type="file" 
+                      accept="image/png, image/jpeg" 
+                      className="hidden" 
+                      onChange={handleImageUpload} 
+                    />
+                  </label>
+                  <button
+                    onClick={() => { setAdImageBase64(null); setImageError(""); }}
+                    className="px-4 py-2.5 bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium rounded-xl hover:bg-red-500/20 transition-colors"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {imageError && (
+              <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2">
+                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                {imageError}
+              </div>
+            )}
           </div>
 
           {/* Tips */}
@@ -288,7 +417,7 @@ export default function SmartCampaignForm() {
           {/* Actions */}
           <div className="flex gap-4">
             <button
-              onClick={() => { setStep("input"); setStrategy(null); }}
+              onClick={() => { setStep("input"); setStrategy(null); setAdImageBase64(null); setImageError(""); }}
               className="flex-1 py-3.5 flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white/70 font-medium rounded-xl hover:bg-white/10 transition-colors"
             >
               <ArrowLeft size={16} />
@@ -320,6 +449,7 @@ export default function SmartCampaignForm() {
           <div className="space-y-3 max-w-sm mx-auto">
             <PublishStep label="Creando campaña en Meta..." active />
             <PublishStep label="Configurando audiencia (15km Ixtlahuaca)" />
+            {adImageBase64 && <PublishStep label="Subiendo imagen del anuncio" />}
             <PublishStep label="Agregando textos del anuncio" />
             <PublishStep label="Activando campaña" />
           </div>
@@ -364,7 +494,7 @@ export default function SmartCampaignForm() {
 
           <div className="flex gap-4 max-w-md mx-auto">
             <button
-              onClick={() => { setStep("input"); setStrategy(null); setPublishResult(null); setObjective(""); }}
+              onClick={() => { setStep("input"); setStrategy(null); setPublishResult(null); setObjective(""); setAdImageBase64(null); setImageError(""); }}
               className="flex-1 py-3 px-4 bg-white/5 border border-white/10 text-white/70 font-medium rounded-xl hover:bg-white/10 transition-colors text-sm"
             >
               Crear otra campaña

@@ -10,12 +10,17 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@remotion/bundler": "^4.0.456",
+    "@remotion/player": "^4.0.456",
+    "@remotion/renderer": "^4.0.456",
     "@supabase/supabase-js": "^2.105.1",
     "clsx": "^2.1.1",
+    "google-tts-api": "^2.0.2",
     "lucide-react": "^1.14.0",
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "remotion": "^4.0.456",
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
