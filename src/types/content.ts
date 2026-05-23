@@ -99,6 +99,7 @@ export type UserRole = "admin" | "academy";
 export interface AppUser {
   id: string;
   email: string;
+  password?: string;
   role: UserRole;
   created_at: string;
 }
