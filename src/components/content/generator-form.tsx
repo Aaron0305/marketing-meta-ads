@@ -5,8 +5,8 @@ import {
   Sparkles, Loader2, Image as ImageIcon, Copy, Check,
   Send, Bot, User, Megaphone, X, Video, PlaySquare, Download
 } from "lucide-react";
-import type { Platform, CopyVariant } from "@/types/content";
-import { generateCopies, chatWithAI, generateVideoScript, type VideoScriptPart } from "@/actions/gemini";
+import type { Platform, CopyVariant, VideoScriptPart } from "@/types/content";
+import { generateCopies, chatWithAI, generateVideoScript } from "@/actions/gemini";
 import { renderVideoToMp4 } from "@/actions/render-video";
 import { Player } from "@remotion/player";
 import { MarketingVideo } from "@/components/video/MarketingVideo";
@@ -611,15 +611,39 @@ export default function GeneratorForm({ userId }: { userId: string }) {
                 </button>
                 
                 <div className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl p-4 mt-4">
-                  <h4 className="text-sm font-medium text-white/70 mb-2">Guion Generado:</h4>
-                  <ul className="space-y-2">
-                    {videoScript.map((part, i) => (
-                      <li key={i} className="text-sm text-white/90 bg-white/5 p-2 rounded-lg">
-                        <span className="text-pink-400 text-xs font-mono mr-2">[{part.durationInFrames}f]</span>
-                        {part.text}
-                      </li>
-                    ))}
-                  </ul>
+                  <h4 className="text-sm font-medium text-white/70 mb-3">Guion por Escenas:</h4>
+                  <div className="space-y-3">
+                    {videoScript.map((part, i) => {
+                      const sceneEmojis: Record<string, string> = {
+                        hook: "🔥", problem: "😫", solution: "💡", benefit: "✨",
+                        "social-proof": "📈", urgency: "⏰", cta: "🚀", content: "📖",
+                      };
+                      return (
+                        <div key={i} className="bg-white/5 rounded-xl overflow-hidden">
+                          <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.03] border-b border-white/5">
+                            <span className="text-sm">{sceneEmojis[part.sceneType] || "🎬"}</span>
+                            <span className="text-xs font-medium text-purple-300 uppercase tracking-wider">
+                              {part.sceneType}
+                            </span>
+                            <span className="text-[10px] text-white/40 font-mono ml-auto">
+                              {part.durationInFrames}f ({Math.round(part.durationInFrames / 30)}s)
+                            </span>
+                          </div>
+                          <div className="px-3 py-2.5 flex items-start gap-2">
+                            <span className="text-xs text-white/90 font-medium flex-1">{part.text}</span>
+                            <span className="text-[10px] text-white/30 whitespace-nowrap mt-0.5">
+                              {part.characterPose} · {part.characterPosition}
+                            </span>
+                          </div>
+                          <div className="px-3 pb-2">
+                            <span className="text-[10px] text-emerald-400/60 italic line-clamp-1">
+                              {part.visualDescription}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
