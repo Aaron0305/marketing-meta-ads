@@ -15,19 +15,22 @@
     "@remotion/renderer": "^4.0.456",
     "@supabase/supabase-js": "^2.105.1",
     "clsx": "^2.1.1",
+    "edge-tts": "^1.0.1",
     "google-tts-api": "^2.0.2",
     "lucide-react": "^1.14.0",
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "remotion": "^4.0.456",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
