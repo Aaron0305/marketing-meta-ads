@@ -7,6 +7,28 @@
  * @see Fase 4-5 del plan maestro
  */
 
+// ─── Scene Types for Video Generation ─────────────────────────────────
+
+export const SCENE_TYPES = [
+  "hook", "intro", "problem", "solution", "benefit",
+  "testimonial", "highlight", "social-proof", "urgency", "cta", "content"
+] as const;
+
+export type SceneType = typeof SCENE_TYPES[number];
+
+export type VideoScriptPart = {
+  text: string;
+  durationInFrames: number;
+  audioUrl?: string;
+  sceneType: SceneType;
+  emotion: string;
+  visualDescription: string;
+  backgroundPrompt: string;
+  sceneImageUrl?: string;
+  characterPose: "idle" | "talking" | "pointing" | "celebrating" | "waving";
+  characterPosition: "left" | "right" | "center";
+};
+
 // ─── Creative Assets ─────────────────────────────────────────────────
 
 export type CreativeType = "copy" | "image" | "both";
