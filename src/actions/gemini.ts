@@ -5,7 +5,7 @@
  * @see Fase 4 del plan maestro
  */
 
-import { getCopyModel, generateWithRetry } from "@/lib/gemini";
+import { getCopyModel } from "@/lib/gemini";
 import { COPY_SYSTEM } from "@/constants/prompts";
 import type {
   GenerateCopyInput, GenerateCopyOutput, CopyVariant, Platform,
@@ -77,13 +77,9 @@ Si te piden analizar una imagen, descríbela y sugiere mejoras para usarla en an
   return result.response.text();
 }
 
-import * as googleTTS from "google-tts-api";
-
-export type VideoScriptPart = {
-  text: string;
-  durationInFrames: number;
-  audioUrl?: string;
-};
+import type { VideoScriptPart } from "@/types/content";
+import { generateAudioBase64 } from "@/lib/tts";
+import { generateImageWithGemini } from "@/lib/gemini";
 
 export async function generateVideoScript(
   objective: string,
@@ -91,17 +87,49 @@ export async function generateVideoScript(
 ): Promise<VideoScriptPart[]> {
   const model = getCopyModel();
 
-  const systemContext = `Eres un guionista experto para videos cortos en redes sociales (Reels, TikTok, Shorts).
-Crea un guion visual de texto para un video promocional de "What Time Is It? Idiomas".
-El video consiste en una imagen de fondo con textos animados que aparecen en secuencia.
-Genera exactamente 3 o 4 partes.
-Responde ÚNICAMENTE con un arreglo JSON válido con el siguiente formato, sin texto adicional:
+  const systemContext = `Eres un guionista y director creativo experto en anuncios publicitarios de alto impacto para redes sociales (Reels, TikTok, Shorts).
+
+Tu tarea es crear un guion visual PUBLICITARIO profesional para "What Time Is It? Idiomas" (academia de inglés en Ixtlahuaca, México).
+
+REGLAS DE ALTO IMPACTO PUBLICITARIO:
+- El video debe contar una micro-historia con estructura: Gancho → Problema → Solución → Beneficio → Prueba Social → Urgencia → Llamado a la acción
+- Cada escena debe tener un PROPÓSITO EMOCIONAL específico
+- El lenguaje debe ser DIRECTO, COLOQUIAL MEXICANO, con poder de persuasión
+- Usa preguntas retóricas, datos concretos y beneficios emocionales
+- El tono debe ser ENERGÉTICO y DINÁMICO como un anuncio real de TV/Redes Sociales
+
+Genera exactamente 6 o 7 escenas que fluyan como un comercial profesional.
+
+SCENE TYPES (usa una secuencia lógica):
+- "hook" → Gancho que atrapa atención en primeros 2 segundos (pregunta o dato impactante)
+- "problem" → El dolor/ necesidad que resuelve el producto
+- "solution" → Cómo la academia resuelve ese problema
+- "benefit" → Beneficio principal transformacional
+- "social-proof" → Prueba social (gente aprendiendo, resultados)
+- "urgency" → Urgencia/ escasez (cupo limitado, promoción)
+- "cta" → Llamado a la acción convincente
+
+Responde ÚNICAMENTE con un arreglo JSON válido, sin texto adicional:
 [
-  { "text": "Texto persuasivo y corto", "durationInFrames": 90 },
-  ...
+  {
+    "text": "Texto persuasivo y conversacional (máximo 10 palabras)",
+    "durationInFrames": 75,
+    "sceneType": "hook",
+    "emotion": "curiosidad | urgencia | deseo | confianza | felicidad | sorpresa | miedo | esperanza",
+    "visualDescription": "Descripción visual de lo que debe mostrar esta escena",
+    "backgroundPrompt": "Prompt detallado para generar imagen de fondo con IA para esta escena",
+    "characterPose": "idle | talking | pointing | celebrating | waving",
+    "characterPosition": "left | right | center"
+  }
 ]
-La duración (durationInFrames) debe estar entre 60 y 120 cuadros por texto (basado en 30fps, 60 = 2 segundos).
-Si hay una imagen de referencia adjunta, haz que el texto se relacione con el contenido de la imagen.`;
+
+REGLAS:
+- durationInFrames entre 60-90 frames (30fps, 60=2s, 90=3s)
+- Texto MÁXIMO 10 palabras por escena (anuncios impactantes son cortos)
+- sceneType debe tener una secuencia narrativa lógica
+- characterPose debe coincidir con la emoción de la escena
+- backgroundPrompt debe describir una escena visual generada por IA que refuerce el mensaje
+- emotion describe el sentimiento que debe transmitir la escena`;
 
   const contentParts: any[] = [{ text: `${systemContext}\n\nObjetivo del video: ${objective}` }];
 
@@ -122,26 +150,49 @@ Si hay una imagen de referencia adjunta, haz que el texto se relacione con el co
 
   const parsedScript = JSON.parse(jsonMatch[0]) as VideoScriptPart[];
 
-  // Generar audio TTS para cada parte
-  for (const part of parsedScript) {
-    try {
-      const audioBase64 = await googleTTS.getAudioBase64(part.text, {
-        lang: 'es',
-        slow: false,
-        host: 'https://translate.google.com',
-      });
-      part.audioUrl = `data:audio/mp3;base64,${audioBase64}`;
-      
-      // Calcular duración estimada basada en la longitud del texto
-      // Asumimos un promedio de lectura de 2.5 palabras por segundo (aprox 12 frames por palabra)
-      // + 30 frames extra (1 segundo) de pausa al final para que respire.
-      const wordCount = part.text.split(" ").length;
-      const estimatedFrames = Math.max(wordCount * 12 + 45, part.durationInFrames);
-      part.durationInFrames = estimatedFrames;
-    } catch (error) {
-      console.warn("Error generating TTS for text:", part.text, error);
-    }
-  }
+  // Generar audio TTS e imágenes de fondo para cada escena en paralelo
+  const sceneTasks = parsedScript.map(async (part, index) => {
+    const tasks: Promise<void>[] = [];
+
+    // TTS
+    tasks.push(
+      (async () => {
+        try {
+          part.audioUrl = await generateAudioBase64(part.text);
+          if (part.audioUrl) {
+            const wordCount = part.text.split(" ").length;
+            const audioFrames = wordCount * 18 + 75;
+            part.durationInFrames = Math.max(audioFrames, part.durationInFrames);
+          }
+        } catch (error) {
+          console.error(`[TTS] Error generando voz para escena ${index}: "${part.text}" =>`, error);
+        }
+      })()
+    );
+
+    // AI background image
+    tasks.push(
+      (async () => {
+        try {
+          const imagePrompt = `Genera una imagen de fondo vertical 1080x1920 para un video publicitario de una academia de inglés.
+Mensaje de la escena: "${part.text}"
+Emoción: ${part.emotion}
+Escena tipo: ${part.sceneType}
+Descripción visual: ${part.visualDescription}
+Estilo: fotografía profesional, vibrante, juvenil, mexicano contemporáneo.
+No incluyas texto en la imagen. Sin tipografía.`;
+          const image = await generateImageWithGemini(imagePrompt, referenceImage);
+          part.sceneImageUrl = `data:${image.mimeType};base64,${image.base64}`;
+        } catch (error) {
+          console.warn("Error generating background image for scene:", index, error);
+        }
+      })()
+    );
+
+    await Promise.all(tasks);
+  });
+
+  await Promise.all(sceneTasks);
 
   return parsedScript;
 }

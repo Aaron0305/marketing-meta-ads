@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
-import type { VideoScriptPart } from "./gemini";
+import type { VideoScriptPart } from "@/types/content";
 
 export async function renderVideoToMp4(formData: FormData): Promise<string> {
   const imageSrc = formData.get("imageSrc") as string;
